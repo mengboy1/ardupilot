@@ -48,6 +48,9 @@ public:
         k_param_NavEKF3,
         k_param_BoardConfig_CAN,
         k_param_osd,
+//修改参数
+        //k_param_omega_wind,         // orientation of figure-8 pattern
+        //k_param_sigma_wind,         // slope of figure-8 pattern       /
 
         // Misc
         //
@@ -348,6 +351,9 @@ public:
     };
 
     AP_Int16 format_version;
+//修改代码
+	//AP_Float omega_wind;	// degrees
+    //AP_Float sigma_wind;	// degrees
 
     // Telemetry control
     //

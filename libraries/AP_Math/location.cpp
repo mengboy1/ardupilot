@@ -39,6 +39,7 @@ float get_bearing_cd(const Vector3f &origin, const Vector3f &destination)
     return bearing;
 }
 
+
 // return true when lat and lng are within range
 bool check_lat(float lat)
 {

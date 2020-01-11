@@ -35,6 +35,10 @@ public:
         QRTL          = 21,
         QAUTOTUNE     = 22,
         QACRO         = 23,
+        LOITER_ELLIPSE = 36,
+        EIGHT_PLANE = 37,
+        LOITER_3D = 38,
+        EIGHT_SPHERE = 39
     };
 
     // Constructor
@@ -420,6 +424,25 @@ public:
     Number mode_number() const override { return Number::QACRO; }
     const char *name() const override { return "QACO"; }
     const char *name4() const override { return "QACRO"; }
+    bool is_vtol_mode() const override { return true; }
+
+    // methods that affect movement of the vehicle in this mode
+    void update() override;
+
+protected:
+
+    bool _enter() override;
+};
+
+
+//修改代码
+class ModeLoiter_Ellipse : public Mode
+{
+public:
+
+    Number mode_number() const override { return Number::LOITER_ELLIPSE; }
+    const char *name() const override { return "LOITER_ELLIPSE"; }
+    const char *name4() const override { return "LELL"; }
 
     bool is_vtol_mode() const override { return true; }
 
@@ -430,6 +453,61 @@ protected:
 
     bool _enter() override;
 };
+
+class ModeEight_Plane : public Mode
+{
+public:
+
+    Number mode_number() const override { return Number::EIGHT_PLANE; }
+    const char *name() const override { return "EIGHT_PLANE"; }
+    const char *name4() const override { return "8R2"; }
+
+    bool is_vtol_mode() const override { return true; }
+
+    // methods that affect movement of the vehicle in this mode
+    void update() override;
+
+protected:
+
+    bool _enter() override;
+};
+
+class ModeLoiter_3D : public Mode
+{
+public:
+
+    Number mode_number() const override { return Number::LOITER_3D; }
+    const char *name() const override { return "LOITER_3D"; }
+    const char *name4() const override { return "L3D"; }
+
+    bool is_vtol_mode() const override { return true; }
+
+    // methods that affect movement of the vehicle in this mode
+    void update() override;
+
+protected:
+
+    bool _enter() override;
+};
+
+class ModeEight_Sphere : public Mode
+{
+public:
+
+    Number mode_number() const override { return Number::EIGHT_SPHERE; }
+    const char *name() const override { return "EIGHT_SPHERE"; }
+    const char *name4() const override { return "8S2"; }
+
+    bool is_vtol_mode() const override { return true; }
+
+    // methods that affect movement of the vehicle in this mode
+    void update() override;
+
+protected:
+
+    bool _enter() override;
+};
+//添加代码（以上）
 
 class ModeQAutotune : public Mode
 {

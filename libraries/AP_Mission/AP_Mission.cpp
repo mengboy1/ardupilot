@@ -581,6 +581,11 @@ bool AP_Mission::stored_in_location(uint16_t id)
     case MAV_CMD_NAV_VTOL_TAKEOFF:
     case MAV_CMD_NAV_VTOL_LAND:
     case MAV_CMD_NAV_PAYLOAD_PLACE:
+//修改代码
+    case MAV_CMD_NAV_LOITER_ELLIPSE:
+    case MAV_CMD_NAV_EIGHT_PLANE:
+    case MAV_CMD_NAV_LOITER_3D:
+    case MAV_CMD_NAV_EIGHT_SPHERE:
         return true;
     default:
         return false;

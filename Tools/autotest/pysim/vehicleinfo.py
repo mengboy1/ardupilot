@@ -125,7 +125,7 @@ class VehicleInfo(object):
         },
     },
     "ArduPlane": {
-        "default_frame": "plane",
+        "default_frame": "plane-elevon",
         "frames": {
             # PLANE
             "quadplane-tilttri": {

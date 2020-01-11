@@ -41,6 +41,10 @@ MAV_MODE GCS_MAVLINK_Plane::base_mode() const
     case Mode::Number::AUTO:
     case Mode::Number::RTL:
     case Mode::Number::LOITER:
+	case Mode::Number::LOITER_ELLIPSE:
+    case Mode::Number::EIGHT_PLANE:
+    case Mode::Number::LOITER_3D:
+    case Mode::Number::EIGHT_SPHERE:
     case Mode::Number::AVOID_ADSB:
     case Mode::Number::GUIDED:
     case Mode::Number::CIRCLE:
@@ -398,7 +402,7 @@ uint32_t GCS_MAVLINK_Plane::telem_delay() const
 // try to send a message, return false if it won't fit in the serial tx buffer
 bool GCS_MAVLINK_Plane::try_send_message(enum ap_message id)
 {
-    // if we don't have at least 0.2ms remaining before the main loop
+	// if we don't have at least 0.2ms remaining before the main loop
     // wants to fire then don't send a mavlink message. We want to
     // prioritise the main flight control loop over communications
     if (!hal.scheduler->in_delay_callback() &&
@@ -407,7 +411,6 @@ bool GCS_MAVLINK_Plane::try_send_message(enum ap_message id)
         gcs().set_out_of_time(true);
         return false;
     }
-
     switch (id) {
 
     case MSG_SERVO_OUT:
@@ -837,6 +840,28 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_long_packet(const mavlink_command_l
         plane.set_mode(plane.mode_rtl, MODE_REASON_GCS_COMMAND);
         return MAV_RESULT_ACCEPTED;
 
+//修改代码
+    case MAV_CMD_NAV_LOITER_ELLIPSE:
+         plane.set_mode(plane.mode_loiter_ellipse, MODE_REASON_GCS_COMMAND);
+         return MAV_RESULT_ACCEPTED;
+         break;
+
+   case MAV_CMD_NAV_EIGHT_PLANE:
+        plane.set_mode(plane.mode_eight_plane, MODE_REASON_GCS_COMMAND);
+        return MAV_RESULT_ACCEPTED;
+        break;
+
+   case MAV_CMD_NAV_LOITER_3D:
+        plane.set_mode(plane.mode_loiter_3D, MODE_REASON_GCS_COMMAND);
+        return MAV_RESULT_ACCEPTED;
+        break;
+
+   case MAV_CMD_NAV_EIGHT_SPHERE:
+        plane.set_mode(plane.mode_eight_sphere, MODE_REASON_GCS_COMMAND);
+        return MAV_RESULT_ACCEPTED;
+        break;
+
+
     case MAV_CMD_NAV_TAKEOFF: {
         // user takeoff only works with quadplane code for now
         // param7 : altitude [metres]
@@ -851,7 +876,7 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_long_packet(const mavlink_command_l
         plane.set_mode(plane.mode_auto, MODE_REASON_GCS_COMMAND);
         return MAV_RESULT_ACCEPTED;
 
-    case MAV_CMD_COMPONENT_ARM_DISARM:
+	   case MAV_CMD_COMPONENT_ARM_DISARM:
         if (is_equal(packet.param1,1.0f)) {
             // run pre_arm_checks and arm_checks and display failures
             const bool do_arming_checks = !is_equal(packet.param2,magic_force_arm_value);
@@ -866,7 +891,6 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_long_packet(const mavlink_command_l
             return MAV_RESULT_FAILED;
         }
         return MAV_RESULT_UNSUPPORTED;
-
     case MAV_CMD_DO_LAND_START:
         // attempt to switch to next DO_LAND_START command in the mission
         if (plane.mission.jump_to_landing_sequence()) {

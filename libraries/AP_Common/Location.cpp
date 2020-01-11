@@ -249,6 +249,26 @@ void Location::offset(float ofs_north, float ofs_east)
     }
 }
 
+//修改代码
+/*
+  return the distance in meters in North/East/Down plane as a N/E/D vector
+  from loc1 to loc2
+ */
+/*Vector3f Location::location_3d_diff_NED(const struct Location &loc1, const struct Location &loc2)
+{
+    return Vector3f((loc2.lat - loc1.lat) * LOCATION_SCALING_FACTOR,
+                    (loc2.lng - loc1.lng) * LOCATION_SCALING_FACTOR * loc1.longitude_scale(),
+                    (loc1.alt - loc2.alt) * 0.01f);
+}*/
+
+Vector3f Location::location_3d_diff_NED(const Location &loc2) const
+{
+    return Vector3f((loc2.lat - lat) * LOCATION_SCALING_FACTOR,
+                    (loc2.lng - lng) * LOCATION_SCALING_FACTOR * loc2.longitude_scale(),
+                    (alt - loc2.alt) * 0.01f);
+}
+
+
 /*
  *  extrapolate latitude/longitude given bearing and distance
  * Note that this function is accurate to about 1mm at a distance of

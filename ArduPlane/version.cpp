@@ -28,6 +28,7 @@ const AP_FWVersion AP_FWVersion::fwver{
     .fw_type = (enum FIRMWARE_VERSION_TYPE)(FW_TYPE),
 #ifndef GIT_VERSION
     .fw_string = THISFIRMWARE,
+					  
 #else
     .fw_string = THISFIRMWARE " (" GIT_VERSION ")",
     .fw_hash_str = GIT_VERSION,

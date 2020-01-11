@@ -167,6 +167,12 @@ public:
     friend class ModeQAcro;
     friend class ModeQAutotune;
 
+//修改代码
+	friend class ModeLoiter_Ellipse;
+	friend class ModeEight_Plane;
+	friend class ModeLoiter_3D;
+	friend class ModeEight_Sphere;
+
     Plane(void);
 
     // HAL::Callbacks implementation.
@@ -331,6 +337,12 @@ private:
     ModeQRTL mode_qrtl;
     ModeQAcro mode_qacro;
     ModeQAutotune mode_qautotune;
+//修改代码
+	ModeLoiter_Ellipse mode_loiter_ellipse;
+	ModeEight_Plane mode_eight_plane;
+	ModeLoiter_3D mode_loiter_3D;
+	ModeEight_Sphere mode_eight_sphere;
+	
 
     // This is the state of the flight control system
     // There are multiple states defined such as MANUAL, FBW-A, AUTO
@@ -711,6 +723,674 @@ private:
         uint32_t time_max_ms;
     } loiter;
 
+	//修改代码
+	    struct Ellipse {
+            struct Location center_loc;
+            int32_t maxradius_cm;
+            float minmaxratio;
+            float azimuth_deg;
+            int8_t orientation;
+            int32_t height_cm;
+
+            // variables to store the current and desired location and velocity
+            struct Location aircraft_loc;
+            Vector3f aircraft_vel;
+            struct Location desired_loc;
+    } ellipse;
+
+		struct eight_on_plane {
+			struct Location center_loc; // location of the center point on the ground
+			int32_t d_c_cm; // horizontal distance from crossing point to turning point
+			int32_t S1_radius_cm; // radius of the turning circles
+			int32_t height_cm; // height of the pattern above the center point
+			float azimuth_deg;
+			int8_t orientation; 	// orientation of the figure-eight pattern
+	
+			// variables to store the current and desired location and velocity
+			struct Location aircraft_loc;
+			Vector3f aircraft_vel;
+			struct Location desired_loc;
+	
+		  // the four segments are labeled by integers 0,1,2,3 in dependence of orientation
+		  // for orientation of the figure-eight pattern: +1: segment sequence is: geodesic_1 -> circle_1 -> geodesic_2 -> circle_2
+		  //											  -1: segment sequence is: geodesic_1 -> circle_2 -> geodesic_2 -> circle_1
+	
+		  // set current quadrant to a value that is not 0,1,2,3 such that it is altered in the initialization
+			int8_t current_quadrant; // = 4
+			int8_t current_segment; // sets the start segment when eight_sphere is initialized
+								  // and the entry segment if no segment switching occurs because the aircraft is located in the vicinity of the crossing point defined by _mindistxaplane
+		  Vector3f current_cv;
+		  Vector3f current_tv;
+		  // derived parameters
+		  // trigonometric functions of all angles
+		  // trigonometric functions of the angles determining the attitude (azimuthal position in the sky) of the figure-eight pattern
+		  float cos_psi; // = cosf(radians(azimuth_deg));
+		  float sin_psi; // = sinf(radians(azimuth_deg));
+		  // trigonometric functions of half of the crossing angle
+		  float sin_chihalf; // = eight_in_R2.S1_radius_cm / eight_in_R2.d_c_cm;
+		  float cos_chihalf; // = sqrt(1 - sq(sin_chihalf));
+	
+		  // crossing point of the figure-eight pattern: coordinate frame, rotation matrix, position vector
+		  // unit vector pointing from S2_loc to the crossing point of the figure-eight pattern
+		  Vector3f erxv; // = Vector3f(0, 0, -1);
+		  // unit vector of the tangential plane at the crossing point in polar direction
+		  Vector3f ethetaxv; // = Vector3f(cos_psi, sin_psi, 0);
+		  // unit vector of the tangential plane at the crossing point in azimuthal direction
+		  Vector3f epsixv; // = Vector3f(-sin_psi, cos_psi, 0);
+		  // rotation matrix that yields the vectors of the figure_eight pattern with crossing point in the direction erxv
+		  // from those of the figure-eight pattern with crossing point at erv; // = (0,0,-1) and turning circle centers aligned with the east axis
+		  Matrix3f Rm; // = Matrix3f(ethetaxv, epsixv, -erxv);
+		  // vector pointing from S2_loc to the crossing point
+		  Vector3f rxv; // = erxv * height_cm / 100.0f;
+	
+		  // figure-eight pattern from four circle segments defined via four planes in canonical orientation
+		  // canonical orientation (at azimuth_deg = 0, elevation_deg = 90 in the NED coordinate system): crossing point is upwards (in the (0,0,-1)-direction) from S2_loc; turning circle centers are aligned along east axis
+		  // figure-8-pattern is given by the sequences:
+		  // for orientation = +1: geodesic_1 -> circle_1 -> geodesic_2 -> circle_2
+		  //				   -1: geodesic_1 -> circle_2 -> geodesic_2 -> circle_1
+		  // individual circle segment orientation = +1 corresponds to applying the right-hand rule to minus the normal vectors pointing to the center of the circle segment
+		  // vector of the first turning circle center
+		  // orientation of c1 = orientation
+		  Vector3f rc1v; // = (Rm * Vector3f(0.0f, d_c_cm, -h_cm));
+		  // vector of the second turning circle center
+		  // orientation of c2 = - orientation
+		  Vector3f rc2v; // = (Rm * Vector3f(0.0f, -d_c_cm, -h_cm));
+		  // location of the turning circle centers
+		  struct Location c1_loc;
+		  struct Location c2_loc;
+	
+	
+		  // vectors from the center of the plane to the eastern transition points
+		  // NE
+		  Vector3f rtg1c1; // = (Rm * (rc1v + Vector3f(S1_radius_cm/100.0f * cos_chihalf, -S1_radius_cm/100.0f * sin_chihalf, 0.0f)));
+		  // SE
+		  Vector3f rtc1g2; // = (Rm * (rc1v + Vector3f(-S1_radius_cm/100.0f * cos_chihalf, -S1_radius_cm/100.0f * sin_chihalf, 0.0f)));
+	
+	
+		  // locations of the transition points
+		  // NE
+		  struct Location g1c1_loc;
+		  // SE
+		  struct Location c1g2_loc;
+		  // SW
+		  struct Location c2g1_loc;
+		  // NW
+		  struct Location g2c2_loc;
+	
+		  // unit tangent vectors of the two geodesic segments
+		  Vector3f etg1v; // = Rm * Vector3f(sin_chihalf, cos_chihalf, 0.0f) * orientation;
+		  Vector3f etg2v; // = Rm * Vector3f(sin_chihalf, -cos_chihalf, 0.0f) * orientation;
+	
+		  // tangent vectors at the transgression points between the segments in the directions demanded by orientation
+		  // in NE quadrant:
+		  Vector3f etg1c1v; // = etg1v;
+		  // in SE quadrant:
+		  Vector3f etc1g2v; // = etg2v;
+		  // in NW quadrant
+		  Vector3f etg2c2v; // = etg2v;
+		  // in SW quadrant
+		  Vector3f etc2g1v; // = etg1v;
+	
+		  // array of the quadrant numbers (0:NE, 1:SE, 2:SW, 3:NW) as passed by the aircraft flying the figure-eight pattern with orientation = +1
+		  int8_t quadrants[4] = {0, 1, 3, 2};
+		  // yields the quadrant counter for the figure-eight-pattern (0:NE, 1:SE, 2:NW, 3:SW) in dependence of the quadrant number
+		  // for given quadrant, the counter is obtained as quadrant_count[quadrant]
+		   int8_t quadrant_count[4] = {0, 1, 3, 2};
+		   // array of turning circle center vectors labeled by the quadrant number
+		   Vector3f centervectors[4]; // = {erc1v * dist_cm / 100.0f, erc1v * dist_cm / 100.0f, erc2v * dist_cm / 100.0f, erc2v * dist_cm / 100.0f};
+			// array of unit tangent vectors at the transgression points of the segments labeled by the quadrant number
+			Vector3f tangentvectors[4]; // = //{etg1c1v, etc1g2v, etc2g1v, etg2c2v};
+		   // array of directions: +1:outbound -1:inbound labeled by the quadrant number
+		   int8_t norientation = -orientation;
+		   int8_t directions[4] = {orientation, norientation, norientation, orientation};
+		   // array of numbers of the first segment in each quadrant for orientation = +1 and second segment in each quadrant for orientation = -1 labeled by the quadrant number
+		   int8_t firstsegments[4] = {0, 1, 3, 2};
+		   // array of numbers of the second segment in each quadrant for orientation = +1 and first segment in each quadrant for orientation = -1 labeled by the quadrant number
+		   int8_t secondsegments[4] = {1, 2, 0, 3};
+	
+	
+	
+	
+		  // segments are labeled by integers: initial:0, second:1, third:2, fourth:3
+		  // orientation = 1: sequence is g1 -> c1 -> g2 -> c2
+		  //				  orientations are 1, 1, 1, -1
+		  // orientation = -1: sequence is g1 -> c2 -> g2 -> c1
+		  //				   orientations are -1, 1, -1, -1
+	
+		  // orientation of the current segment in dependence of the orientation of the figure-eight pattern
+		  int8_t current_orientation() {
+			  int8_t _orient=1;
+			  switch(current_segment * orientation){
+				  case 0: _orient = orientation; break;
+				  // orientation = 1
+				  case 1: _orient = orientation; break;
+				  case 2: _orient = orientation; break;
+				  case 3: _orient = -orientation; break;
+				  // orientation = -1;
+				  case -1: _orient = -orientation; break;
+				  case -2: _orient = orientation; break;
+				  case -3: _orient = orientation; break;
+			  };
+			  return _orient;
+		  }
+	
+	
+	
+		  // vector from the center of the S2 to the aircraft projected onto the tangential plane at the crossing point
+		  Vector3f rxaplanev(Vector3f rav) {
+			  // vector from crossing point to the aircraft
+			  Vector3f _rxav;
+			  // projection of _rxav onto plane defining the circle segment
+			  _rxav = rav - erxv * (erxv * rav);
+			  // alternative construction via cross product
+			  // _rxav = -(_rav % erxv) % erxv;
+			  return _rxav;
+		  }
+	
+		  // quadrants are labeled by integers: NE:0, SE:1, SW:2, NW:3 for the figure-eight pattern with crossing point in the direction (0,0,-1) and east-west attitude;
+		  // returns the index of the quadrant in which the aircraft is located
+		  int8_t quadrant(const Vector3f rav) {
+			  Vector3f _rxaplanev = rxaplanev(rav);
+			  int8_t _current_quadrant;
+			  // north or south
+			  if (_rxaplanev * ethetaxv >= 0) {_current_quadrant = -2;} else {_current_quadrant = -1;}
+			  // east or west
+			  if (_rxaplanev * epsixv >= 0) {_current_quadrant = _current_quadrant + 2;} else {_current_quadrant = -_current_quadrant + 1;};
+			  // current_quadrant is set to integer 0,1,2,3, where: NE:0, SE:1, SW:2, NW:3
+			  return _current_quadrant;
+		   }
+	
+		  bool entered_next_quadrant;
+		  bool close_to_crossing_point;
+		  bool moving_matches_orientation;
+		  bool switch_to_2nd_segment_in_quadrant;
+	
+	
+		  // set the current segment in dependence of the position relative to the center of the sphere and velocity vector of the aircraft
+		  void set_current_segment(const struct Location aloc, const Vector3f vav) {
+			  Vector3f rav = center_loc.location_3d_diff_NED(aloc);
+			  // position vector from the center of the S2 to the aircraft projected onto the tangential plane at the crossing point
+			  Vector3f _rxaplanev = rxaplanev(rav);
+			  // minimum distance of aircraft from crossing point in the plane at which consecutive segment switching is allowed
+			  float _mindistxaplane = 0.25f * d_c_cm / 100.0f; // set to half of length of each of the four geodesic arms projected onto the tangential plane at the crossing point
+			  //
+			  close_to_crossing_point = bool(_rxaplanev.length() <= _mindistxaplane);
+			  // set internal variable _current quadrant in dependence of the location of the aircraft
+			  int8_t _current_quadrant = quadrant(rav);
+			  // set internal variable _current segment
+			  int8_t _current_segment = current_segment;
+			  int8_t _next_quadrant = quadrants[(quadrant_count[_current_quadrant] + orientation) % 4];
+	
+	
+			  if (current_quadrant != _current_quadrant){
+				  // aircraft is not too close to the crossing point and the quadrant has changed
+				  // determine if aircraft entered the next quadrant
+				  entered_next_quadrant = bool(_current_quadrant == _next_quadrant);
+				  if (entered_next_quadrant) {
+					  // aircraft has entered correct next quadrant
+					  // switch to next quadrant
+					  current_quadrant = _current_quadrant;
+					  // reset variable
+					  entered_next_quadrant = false;
+				  }
+			  }
+	
+			  // center vector associated with the current quadrant
+			  Vector3f _current_cv = centervectors[current_quadrant];
+			  current_cv = _current_cv;
+			  // tangent vector at the transgression point between two segments associated with the current quadrant
+			  Vector3f _current_tv = tangentvectors[current_quadrant];
+			  current_tv = _current_tv;
+			  // position vector from center of the current turning circle to the aircraft
+			  // direction of flight in the current quadrant: +1:outbound, -1:inbound
+			  int8_t _current_direction = directions[current_quadrant];
+	
+			  Vector3f _rcav = rav - _current_cv;
+			  //rcav = _rcav;
+			  // true if the current segment is the first in the quadrant: transgression point of that quadrant will be passed
+			  switch_to_2nd_segment_in_quadrant  = bool(_rcav * _current_tv >= 0);
+			  // true if the velocity vector of the aircraft is outbound / inbound	in the quadrants (0,3) / (1,2) for orientation = +1 and vice versa for orientation = -1
+			  moving_matches_orientation = bool(vav * _current_cv * _current_direction > 0);
+			  //projection = _rcav * _current_tv;
+	
+	
+			  //		  if(close_to_crossing_point) {
+			  //			  // aircraft is in the vicinity of the crossing point
+			  //			  // select geodesic segment with orientation best aligned with the velocity vector of the aircraft
+			  //			  if(vav * (etg1xv - etg2xv) >= 0){
+			  //				  // select segment corresponding to g1
+			  //				  _current_segment = 0;
+			  //			  } else {
+			  //				  // select segment corresponding to g2
+			  //				  _current_segment = 2;
+			  //			}
+			  //		  } else {
+	
+			  // switch to the second segment in the quadrant if required
+			  if (close_to_crossing_point){
+				  // aircraft is in the vicinity  to crossing point
+				  // select geodesic segment with orientation best aligned with the velocity vector of the aircraft
+	//				if(vav * (etg1v - etg2v) >= 0){
+	//					// select segment corresponding to g1
+	//					_current_segment = 0;
+	//				} else {
+	//					// select segment corresponding to g2
+	//					_current_segment = 2;
+	//				}
+			  } else {
+				  // aircraft is not in the vicinity of the crossing point
+				  // switch from first to second segment in the quadrant
+				  _current_segment = firstsegments[current_quadrant];
+				  if (switch_to_2nd_segment_in_quadrant){
+					  _current_segment = secondsegments[current_quadrant];
+					  //current_segment = _current_segment;
+				  }
+			  }
+	
+			  current_quadrant = _current_quadrant;
+			  current_segment = _current_segment;
+		  }
+	
+		} eight_in_R2;
+	
+	
+	
+		struct circ_on_sphere {
+			struct Location S2_loc;
+			//struct Location S1_loc;
+			Vector3f ercv;
+			int32_t S2_radius_cm;
+			int32_t S1_radius_cm;
+			int32_t distance_cm; // distance of center of the circle from the center of the sphere
+			float theta_rho_deg; // half of the opening angle of the cone with base S1
+			float azimuth_deg;
+			float elevation_deg;
+			int8_t orientation;
+			// variables to store the current and desired location and velocity
+			//		  int32_t height_cm;
+			struct Location aircraft_loc;
+			Vector3f aircraft_vel;
+			struct Location desired_loc;
+		} S1_in_S2;
+	
+	
+		// eight_on_sphere consists of two geodesic segments and two turning (small) circle (S^1) segments on the sphere (S^2)
+		// each S^1 is defined as intersection of a plane with S^2
+		// definition of S^2 (hemisphere): center at Location S2_loc,  radius S2_radius_cm
+		// definition of a plane: unit normal Vector3f erc, angle theta_r_deg (yields distance of the plane from the origin dist_cm = S2_radius_cm * cos(theta_r_deg))
+		struct eight_on_sphere {
+	
+			// parameters to be defined by the user
+			struct Location S2_loc; // location of the center of the S2
+			int32_t S2_radius_cm;	// radius of the S2 in cm
+			float theta_c_deg;		// half of the angle between the centers of the two turning circle segments, range: [0,90] degrees
+			float theta_r_deg;		// half of the opening angle of the cone with tip at S2_loc and base given by the turning circle, range: [0,90-theta_c_deg] degrees in order to guarantee that the sweeping angle between the two apices is less than 180 deg
+			float azimuth_deg;		// azimuth angle of the vector pointing from S2_loc to the crossing point of the figure-eight pattern, range: [0,360]
+			float elevation_deg;	// elevation angle of the vector pointing from S2_loc to the crossing point of the figure-eight pattern, range [0,90]
+			int8_t orientation; 	// orientation of the figure-eight pattern: +1: downwards flight on geodesic, upwards flight on turning circle segments
+								  //										  -1: upwards flight on geodesic, downwards flight on turning circle segments
+								  //										  for 0 < elevation_deg < 90
+	
+	
+			// variables to store the current and desired location and velocity
+			struct Location aircraft_loc;
+			Vector3f aircraft_vel;
+			struct Location desired_loc;
+	
+		  // the four segments are labeled by integers 0,1,2,3 in dependence of orientation
+		  // for orientation of the figure-eight pattern: +1: segment sequence is: geodesic_1 -> circle_1 -> geodesic_2 -> circle_2
+		  //											  -1: segment sequence is: geodesic_1 -> circle_2 -> geodesic_2 -> circle_1
+		  // set current quadrant to a value that is not 0,1,2,3 such that it is altered in the initialization
+			 int8_t current_quadrant; // = 4
+			 int8_t current_segment; // sets the start segment when eight_sphere is initialized
+									// and the entry segment if no segment switching occurs because the aircraft is located in the vicinity of the crossing point defined by _mindistxaplane
+			Vector3f current_cv;
+			Vector3f current_tv;
+	
+		  // derived parameters
+		  // trigonometric functions of all angles
+		  // calculation of polar angle from elevation
+		  float theta; // = 90 - elevation_deg;
+		  // trigonometric functions of the angles determining the attitude (azimuthal and polar position in the sky) of the figure-eight pattern
+		  float cos_psi; // = cosf(radians(azimuth_deg));
+		  float sin_psi; // = sinf(radians(azimuth_deg));
+		  float cos_theta; // = cosf(radians(theta));
+		  float sin_theta; // = sinf(radians(theta));
+		  // trigonometric functions of the opening angle
+		  // ratio of distance of the turning circle plane and of the radius of the sphere
+		  float cos_theta_r; // = cosf(radians(theta_r_deg));
+		  // ratio of the turning circle radius and of the radius of the sphere
+		  float sin_theta_r; // = sinf(radians(theta_r_deg));
+		  // trigonometric functions of the polar angle of the center of the turning circle
+		  float cos_theta_c; // = cosf(radians(theta_c_deg));
+		  float sin_theta_c; // = sinf(radians(theta_c_deg));
+		  // trigonometric functions of half of the crossing angle
+		  float cos_chihalf; // = sqrt(1 - sq(sin_theta_r/sin_theta_c));
+		  float sin_chihalf; // = sqrt(1 - sq(cos_chihalf));
+		  // trigonometric functions of half of the sweeping angle of the geodesic segments
+		  float cos_theta_0; // = cos_theta_c/cos_theta_r;
+		  float sin_theta_0; // = sqrt(1 - sq(cos_theta_0));
+	
+		  // turning circle segments of the figure-eight pattern: circle radius, distance from origin
+		  // radius
+		  int32_t S1_radius_cm; // = S2_radius_cm * sin_theta_r;
+		  // distance of the centers from S2_loc;
+		  int32_t dist_cm; // = S2_radius_cm * sin_theta_r;
+	
+		  // crossing point of the figure-eight pattern: coordinate frame, rotation matrix, position vector
+		  // unit vector pointing from S2_loc to the crossing point of the figure-eight pattern
+		  Vector3f erxv; // = Vector3f(sin_theta * cos_psi, sin_theta * sin_psi, -cos_theta );
+		  // unit vector of the tangential plane at the crossing point in polar direction
+		  Vector3f ethetaxv; // = Vector3f(cos_theta * cos_psi, cos_theta * sin_psi, sin_theta);
+		  // unit vector of the tangential plane at the crossing point in azimuthal direction
+		  Vector3f epsixv; // = Vector3f(-sin_psi, cos_psi, 0);
+		  // rotation matrix that yields the vectors of the figure_eight pattern with crossing point in the direction erxv
+		  // from those of the figure-eight pattern with crossing point at erv; // = (0,0,-1) and turning circle centers aligned with the east axis
+		  Matrix3f Rm; // = Matrix3f(ethetaxv, epsixv, -erxv);
+		  // vector pointing from S2_loc to the crossing point
+		  Vector3f rxv; // = erxv * dist_cm / 100.0f;
+	
+		  // figure-eight pattern from four circle segments defined via four planes in canonical orientation
+		  // canonical orientation (at azimuth_deg = 0, elevation_deg = 90 in the NED coordinate system): crossing point is upwards (in the (0,0,-1)-direction) from S2_loc; turning circle centers are aligned along east axis
+		  // figure-8-pattern is given by the sequences:
+		  // for orientation = +1: geodesic_1 -> circle_1 -> geodesic_2 -> circle_2
+		  //				   -1: geodesic_1 -> circle_2 -> geodesic_2 -> circle_1
+		  // individual circle segment orientation = +1 corresponds to applying the right-hand rule to minus the normal vectors pointing to the center of the circle segment
+		  // unit normal vector of the first turning circle plane (pointing to the center of the first turning circle c1)
+		  // orientation of c1 = orientation
+		  Vector3f erc1v; // = Rm * Vector3f(0.0f, sin_theta_c, -cos_theta_c);
+		  // unit normal vector of the second turning circle plane (pointing to the center of the second turning circle c2)
+		  // orientation of c2 = - orientation
+		  Vector3f erc2v; // = Rm * Vector3f(0.0f, -sin_theta_c, -cos_theta_c);
+		  // unit normal vector of the first geodesic plane (geodesic g1: from south-west to north-east)
+		  // orientation of g1 = orientation
+		  Vector3f erg1v; // = Rm * Vector3f(-cos_chihalf, sin_chihalf, 0.0f);
+		  // unit normal vector of the second geodesic segment (geodesic g2: from south-east to north-west)
+		  // orientation of g2 = orientation
+		  Vector3f erg2v; // = Rm * Vector3f(cos_chihalf, sin_chihalf, 0.0f);
+	
+		  // tangent vectors at the transgression points between the segments in the directions demanded by orientation
+		  // in NE quadrant:
+		  Vector3f etg1c1v; // = Rm * Vector3f(cos_theta_0 * sin_chihalf, cos_theta_0 * cos_chihalf, sin_theta_0) * orientation;
+		  // in SE quadrant:
+		  Vector3f etc1g2v; // = Rm * Vector3f(cos_theta_0 * sin_chihalf, -cos_theta_0 * cos_chihalf, -sin_theta_0) * orientation;
+		  // in NW quadrant
+		  Vector3f etg2c2v; // = Rm * Vector3f(cos_theta_0 * sin_chihalf, -cos_theta_0 * cos_chihalf, sin_theta_0) * orientation;
+		  // in SW quadrant
+		  Vector3f etc2g1v; // = Rm * Vector3f(cos_theta_0 * sin_chihalf, cos_theta_0 * cos_chihalf, -sin_theta_0) * orientation;
+	
+		  // tangent vectors at the crossing point
+		  Vector3f etg1xv; // = Rm * Vector3f(sin_chihalf, cos_chihalf, 0.0f) * orientation;
+		  Vector3f etg2xv; // = Rm * Vector3f(sin_chihalf, -cos_chihalf, 0.0f) * orientation;
+	
+		  // segments are labeled by integers: initial:0, second:1, third:2, fourth:3
+		  // orientation = 1: sequence is g1 -> c1 -> g2 -> c2
+		  //				  orientations are 1, 1, 1, -1
+		  // orientation = -1: sequence is g1 -> c2 -> g2 -> c1
+		  //				   orientations are -1, 1, -1, -1
+	
+	
+		  // array of the quadrant numbers (0:NE, 1:SE, 2:SW, 3:NW) as passed by the aircraft flying the figure-eight pattern with orientation = +1
+		  int8_t quadrants[4] = {0, 1, 3, 2};
+		  // yields the quadrant counter for the figure-eight-pattern (0:NE, 1:SE, 2:NW, 3:SW) in dependence of the quadrant number
+		  // for given quadrant, the counter is obtained as quadrant_count[quadrant]
+		   int8_t quadrant_count[4] = {0, 1, 3, 2};
+		   // array of turning circle center vectors labeled by the quadrant number
+		   Vector3f centervectors[4]; // = {erc1v * dist_cm / 100.0f, erc1v * dist_cm / 100.0f, erc2v * dist_cm / 100.0f, erc2v * dist_cm / 100.0f};
+			// array of unit tangent vectors at the transgression points of the segments labeled by the quadrant number
+			Vector3f tangentvectors[4]; // = //{etg1c1v, etc1g2v, etc2g1v, etg2c2v};
+			// array of directions: +1:outbound -1:inbound labeled by the quadrant		 // array of unit tangent vectors at the transgression points of the segments labeled by the quadrant counter (not the quadrant number)
+		   // array of directions: +1:outbound -1:inbound labeled by the quadrant number
+		   int8_t norientation = -orientation;
+		   int8_t directions[4] = {orientation, norientation, norientation, orientation};
+		   // array of numbers of the first segment in each quadrant for orientation = +1 and second segment in each quadrant for orientation = -1 labeled by the quadrant number
+		   int8_t firstsegments[4] = {0, 1, 3, 2};
+		   // array of numbers of the second segment in each quadrant for orientation = +1 and first segment in each quadrant for orientation = -1 labeled by the quadrant number
+		   int8_t secondsegments[4] = {1, 2, 0, 3};
+	
+	
+	
+		  // unit vector to the center of the current segment in dependence of the orientation of the figure-eight pattern
+	//		 Vector3f ercvs[4] = {erg1v, erc1v, erg2v, erc2v};
+		   Vector3f current_ercv() {
+			  Vector3f _vec = Vector3f(0,0,-1);
+			  switch(current_segment){
+				  case 0: _vec = erg1v; break;
+				  // orientation = 1
+				  case 1: _vec = erc1v; break;
+				  case 2: _vec = erg2v; break;
+				  case 3: _vec = erc2v; break;
+	//				// orientation = -1;
+	//				case -1: _vec = erc2v; break;
+	//				case -2: _vec = erg2v; break;
+	//				case -3: _vec = erc1v; break;
+			  };
+			  return _vec;
+		  }
+	
+		  // orientation of the current segment in dependence of the orientation of the figure-eight pattern
+	//		int8_t orientations[4] = {orientation, orientation, orientation, norientation};
+		  int8_t current_orientation() {
+			  int8_t _orient=1;
+			  switch(current_segment){
+				  case 0: _orient = orientation; break;
+				  // orientation = 1
+				  case 1: _orient = orientation; break;
+				  case 2: _orient = orientation; break;
+				  case 3: _orient = -orientation; break;
+	//				// orientation = -1;
+	//				case -1: _orient = -orientation; break;
+	//				case -2: _orient = orientation; break;
+	//				case -3: _orient = orientation; break;
+			  };
+			  return _orient;
+		  }
+	
+		  // angle theta_r of the current segment in dependence of the orientation of the figure-eight pattern
+		  // planes defining geodesics contain the center and hence have theta_r_deg = 90
+	//		float thetars[4] = {90.0f, theta_r_deg, 90.0f, theta_r_deg};
+				float current_theta_r() {
+			  float _theta_r=30.0f;
+			  switch(current_segment){
+				  case 0: _theta_r = 90.0f; break;
+				  // orientation = 1
+				  case 1: _theta_r = theta_r_deg; break;
+				  case 2: _theta_r = 90.0f; break;
+				  case 3: _theta_r = theta_r_deg; break;
+	//				// orientation = -1;
+	//				case -1: _theta_r = theta_r_deg; break;
+	//				case -2: _theta_r = 90.0f; break;
+	//				case -3: _theta_r = theta_r_deg; break;
+			  };
+			  return _theta_r;
+		  }
+	
+	
+	
+		  // vector from the center of the S2 to the aircraft projected onto the tangential plane at the crossing point
+		  Vector3f rxaplanev(Vector3f rav) {
+			  // vector from crossing point to the aircraft
+			  Vector3f _rxav;
+			  // projection of _rxav onto plane defining the circle segment
+			  _rxav = rav - erxv * (erxv * rav);
+			  // alternative construction via cross product
+			  // _rxav = -(_rav % erxv) % erxv;
+			  return _rxav;
+		  }
+	
+	
+	
+		  // quadrants are labeled by integers: NE:0, SE:1, SW:2, NW:3 for the figure-eight pattern with crossing point in the direction (0,0,-1) and east-west attitude;
+		  // returns the index of the quadrant in which the aircraft is located
+		  int8_t quadrant(const Vector3f rav) {
+			  Vector3f _rxaplanev = rxaplanev(rav);
+			  int8_t _current_quadrant;
+			  // north or south
+			  if (_rxaplanev * ethetaxv >= 0) {_current_quadrant = -2;} else {_current_quadrant = -1;}
+			  // east or west
+			  if (_rxaplanev * epsixv >= 0) {_current_quadrant = _current_quadrant + 2;} else {_current_quadrant = -_current_quadrant + 1;};
+			  // current_quadrant is set to integer 0,1,2,3, where: NE:0, SE:1, SW:2, NW:3
+			  return _current_quadrant;
+		   }
+	
+			   // bool entered_new_quadrant;
+				bool close_to_crossing_point;
+				bool in_initial_quadrant; // = true; // has to be set to true in order to enable segment switching in the initial quadrant
+				bool entered_next_quadrant;
+				bool moving_matches_orientation;
+				bool switch_to_2nd_segment_in_quadrant;
+				//Vector3f current_cv;
+				Vector3f rcav;
+				float projection;
+	
+		  // set the current segment in dependence of the position relative to the center of the sphere and velocity vector of the aircraft
+		  void set_current_segment(const struct Location aloc, const Vector3f vav) {
+			  Vector3f rav = S2_loc.location_3d_diff_NED(aloc);
+			  // position vector from the center of the S2 to the aircraft projected onto the tangential plane at the crossing point
+			  Vector3f _rxaplanev = rxaplanev(rav);
+			  // minimum distance of aircraft from crossing point in the plane at which consecutive segment switching is allowed
+			  float _mindistxaplane = 0.25f * S2_radius_cm / 100.0f * sin_theta_0; // set to half of length of each of the four geodesic arms projected onto the tangential plane at the crossing point
+			  //
+			  close_to_crossing_point = bool(_rxaplanev.length() <= _mindistxaplane);
+			  // set internal variable _current quadrant in dependence of the location of the aircraft
+			  int8_t _current_quadrant = quadrant(rav);
+			  // set internal variable _current segment
+			  int8_t _current_segment = current_segment;
+			  int8_t _next_quadrant = quadrants[(quadrant_count[_current_quadrant] + orientation) % 4];
+	
+	
+			  if (current_quadrant != _current_quadrant){
+				  // aircraft is not too close to the crossing point and the quadrant has changed
+				  // determine if aircraft entered the next quadrant
+				  entered_next_quadrant = bool(_current_quadrant == _next_quadrant);
+				  if (entered_next_quadrant) {
+					  // aircraft has entered correct next quadrant
+					  // switch to next quadrant
+					  current_quadrant = _current_quadrant;
+					  // reset variable
+					  entered_next_quadrant = false;
+				  }
+			  }
+	
+			  // center vector associated with the current quadrant
+			  Vector3f _current_cv = centervectors[current_quadrant];
+			  current_cv = _current_cv;
+			  // tangent vector at the transgression point between two segments associated with the current quadrant
+			  Vector3f _current_tv = tangentvectors[current_quadrant];
+			  current_tv = _current_tv;
+			  // position vector from center of the current turning circle to the aircraft
+			  // direction of flight in the current quadrant: +1:outbound, -1:inbound
+			  int8_t _current_direction = directions[current_quadrant];
+	
+			  Vector3f _rcav = rav - _current_cv;
+			  rcav = _rcav;
+			  Vector2f _rcavl(_rcav.x,_rcav.y);
+			  Vector2f _current_tvl(_current_tv.x,_current_tv.y);
+			  projection = _rcavl * _current_tvl;
+			  // true if the current segment is the first in the quadrant: transgression point of that quadrant will be passed
+			  switch_to_2nd_segment_in_quadrant  = bool(projection >=0);//bool(_rcav * _current_tv >= 0);
+			  // true if the velocity vector of the aircraft is outbound / inbound	in the quadrants (0,3) / (1,2) for orientation = +1 and vice versa for orientation = -1
+			  moving_matches_orientation = bool(vav * _current_cv * _current_direction > 0);
+	
+	
+	
+	
+			  //		  if(close_to_crossing_point) {
+			  //			  // aircraft is in the vicinity of the crossing point
+			  //			  // select geodesic segment with orientation best aligned with the velocity vector of the aircraft
+			  //			  if(vav * (etg1xv - etg2xv) >= 0){
+			  //				  // select segment corresponding to g1
+			  //				  _current_segment = 0;
+			  //			  } else {
+			  //				  // select segment corresponding to g2
+			  //				  _current_segment = 2;
+			  //			}
+			  //		  } else {
+	
+			  // switch to the second segment in the quadrant if required
+			  if (close_to_crossing_point){
+				  // aircraft is in the vicinity  to crossing point
+				  // select geodesic segment with orientation best aligned with the velocity vector of the aircraft
+	//				if(vav * (etg1v - etg2v) >= 0){
+	//					// select segment corresponding to g1
+	//					_current_segment = 0;
+	//				} else {
+	//					// select segment corresponding to g2
+	//					_current_segment = 2;
+	//				}
+			  } else {
+				  // aircraft is not in the vicinity of the crossing point
+				  // switch from first to second segment in the quadrant
+				  _current_segment = firstsegments[current_quadrant];
+				  if (switch_to_2nd_segment_in_quadrant){
+					  _current_segment = secondsegments[current_quadrant];
+					  //current_segment = _current_segment;
+				  }
+			  }
+	
+			  current_quadrant = _current_quadrant;
+			  current_segment = _current_segment;
+		  }
+	
+		}	eight_in_S2;
+	
+	
+	
+	// code: Thomas Gehrmann
+		struct {
+			// rotation around e_z and e_y
+			float psi_plane;
+			float theta_plane;
+	
+			int32_t distance_cm;		 // distance between plane and origin in cm
+	
+			Vector3f normal_vec;	// normal vector, perpendicular to plane spanned by rotated e_y and e_x
+			struct Location circle_center;
+	
+			int32_t sphere_radius_cm;	 // radius of sphere in cm
+			float circle_radius;	// radius of cross section between sphere and plane in m
+	
+			Matrix3f rot_matrix_pe;    // describes an earth frame vector in the new plane frame
+	
+	//		  int32_t height;			// z position on circle
+			Location desired_loc;		 // location of desired point on circle
+	
+			float eccent;			   // eccentricity of circle projection (ellipse)
+	
+		} intersection;
+	
+	// code: Thomas Gehrmann
+		struct {
+	
+			float omega;			  // rotation of eight around e_z in ef, omega equals winddirection
+			float omega_old;			// check if omega has changed during flight
+			float sigma;				// rotation of eight around e_y'
+	
+			float cross_angle;		 // half angle of crossing path
+			float arc_length_angle;
+	
+			float eta;			  // angle of intersection circle
+	
+			float secant;			// distance between two ending points
+	
+			float sector_angle; 	// 2*sector_angle + pi = sector of circle
+	
+			Vector3f normal_vec;	// Unitvector to circle center
+			//Matrix3f rot_8_matrix;  // rotates (active) the whole eight around omega and eta
+	
+			Matrix3f rot_matrix_right; // describes an earth frame vector in the plane frame of right turning circles
+			Matrix3f rot_matrix_left;
+			Matrix3f rot_matrix_cross1;
+			Matrix3f rot_matrix_cross2;
+	
+			struct Location circle_center_left;
+			struct Location circle_center_right;
+	
+			int32_t segment = 0;		 // defines on which segment of the eight the plane is
+	
+		} eight_sphere;
+
+
 
     // Conditional command
     // A value used in condition commands (eg delay, change alt, etc.)
@@ -829,7 +1509,7 @@ private:
     void Log_Write_Nav_Tuning();
     void Log_Write_Status();
     void Log_Write_Sonar();
-    void Log_Arm_Disarm();
+	void Log_Arm_Disarm();					  
     void Log_Write_RC(void);
     void Log_Write_Vehicle_Startup_Messages();
     void Log_Write_AOA_SSA();
@@ -880,6 +1560,12 @@ private:
     bool verify_vtol_takeoff(const AP_Mission::Mission_Command &cmd);
     bool verify_vtol_land(const AP_Mission::Mission_Command &cmd);
     void do_loiter_at_location();
+//修改代码
+    void do_loiter_ellipse();
+    void do_eight_plane();
+    void do_loiter_3d();
+    void do_eight_sphere();
+
     bool verify_loiter_heading(bool init);
     void exit_mission_callback();
     void mavlink_delay(uint32_t ms);
@@ -907,6 +1593,7 @@ private:
     bool geofence_check_minalt(void);
     bool geofence_check_maxalt(void);
     void geofence_check(bool altitude_check_only);
+    //bool geofence_prearm_check(void);
     bool geofence_stickmixing(void);
     void geofence_send_status(mavlink_channel_t chan);
     bool geofence_breached(void);
@@ -920,6 +1607,14 @@ private:
     void calc_airspeed_errors();
     void calc_gndspeed_undershoot();
     void update_loiter(uint16_t radius);
+	
+	//修改代码
+    void update_loiter_ellipse();
+    void update_eight_plane();
+    void update_loiter_3d();
+    void update_eight_sphere();
+
+	
     void update_cruise();
     void update_fbwb_speed_height(void);
     void setup_turn_angle(void);
@@ -947,9 +1642,9 @@ private:
     void startup_INS_ground(void);
     bool should_log(uint32_t mask);
     int8_t throttle_percentage(void);
-    void change_arm_state(void);
+	void change_arm_state(void);
     bool disarm_motors(void);
-    bool arm_motors(AP_Arming::Method method, bool do_arming_checks=true);
+    bool arm_motors(AP_Arming::Method method, bool do_arming_checks=true);																		  
     bool auto_takeoff_check(void);
     void takeoff_calc_roll(void);
     void takeoff_calc_pitch(void);
@@ -1052,7 +1747,7 @@ private:
     void publish_osd_info();
 #endif
     void accel_cal_update(void);
-    void update_soft_armed();
+	void update_soft_armed();						 
 #if SOARING_ENABLED == ENABLED
     void update_soaring();
 #endif
