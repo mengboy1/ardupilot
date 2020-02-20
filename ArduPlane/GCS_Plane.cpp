@@ -78,6 +78,14 @@ void GCS_Plane::update_vehicle_sensor_status_flags(void)
     case Mode::Number::AUTO:
     case Mode::Number::RTL:
     case Mode::Number::LOITER:
+
+//修改代码
+    case Mode::Number::LOITER_ELLIPSE:
+    case Mode::Number::EIGHT_PLANE:
+    case Mode::Number::LOITER_3D:
+    case Mode::Number::EIGHT_SPHERE:
+
+
     case Mode::Number::AVOID_ADSB:
     case Mode::Number::GUIDED:
     case Mode::Number::CIRCLE:

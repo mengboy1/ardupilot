@@ -136,6 +136,7 @@ void Plane::update_soft_armed()
     logger.set_vehicle_armed(hal.util->get_soft_armed());
 }
 
+
 // update AHRS system
 void Plane::ahrs_update()
 {
@@ -515,6 +516,24 @@ void Plane::update_navigation()
     case Mode::Number::CRUISE:
         update_cruise();
         break;
+	
+	//添加的代码
+    case Mode::Number::LOITER_ELLIPSE:
+        update_loiter_ellipse();
+        break;
+
+    case Mode::Number::EIGHT_PLANE:
+        update_eight_plane();
+        break;
+
+    case Mode::Number::LOITER_3D:
+        update_loiter_3d();
+        break;
+
+    case Mode::Number::EIGHT_SPHERE:
+        update_eight_sphere();
+        break;
+
 
     case Mode::Number::MANUAL:
     case Mode::Number::STABILIZE:
@@ -593,6 +612,20 @@ void Plane::update_alt()
         if (g2.soaring_controller.is_active() && g2.soaring_controller.get_throttle_suppressed()) {
             soaring_active = true;
         }
+		
+		if (control_mode == &mode_loiter_3D || &mode_eight_sphere) {
+					SpdHgt_Controller->update_pitch_throttle(relative_target_altitude_cm(),
+															 target_airspeed_cm,
+															 flight_stage,
+															 distance_beyond_land_wp,
+															 get_takeoff_pitch_min_cd(),
+															 throttle_nudge,
+															 tecs_hgt_afe(),
+															 aerodynamic_load_factor,
+															 eight_sphere.segment);
+		
+		}//修改代码
+
 #endif
         
         SpdHgt_Controller->update_pitch_throttle(relative_target_altitude_cm(),
@@ -647,10 +680,42 @@ void Plane::update_flight_stage(void)
     } else {
         set_flight_stage(AP_Vehicle::FixedWing::FLIGHT_NORMAL);
     }
-
-    // tell AHRS the airspeed to true airspeed ratio
-    airspeed.set_EAS2TAS(barometer.get_EAS2TAS());
+	// tell AHRS the airspeed to true airspeed ratio
+	airspeed.set_EAS2TAS(barometer.get_EAS2TAS());
 }
+
+
+
+
+
+//修改代码
+/*#if OPTFLOW == ENABLED
+// called at 50hz
+void Plane::update_optical_flow(void)
+{
+    static uint32_t last_of_update = 0;
+
+    // exit immediately if not enabled
+    if (!optflow.enabled()) {
+        return;
+    }
+
+    // read from sensor
+    optflow.update();
+
+    // write to log and send to EKF if new data has arrived
+    if (optflow.last_update() != last_of_update) {
+        last_of_update = optflow.last_update();
+        uint8_t flowQuality = optflow.quality();
+        Vector2f flowRate = optflow.flowRate();
+        Vector2f bodyRate = optflow.bodyRate();
+        const Vector3f &posOffset = optflow.get_pos_offset();
+        ahrs.writeOptFlowMeas(flowQuality, flowRate, bodyRate, last_of_update, posOffset);
+        Log_Write_Optflow();
+    }
+}
+#endif
+*/
 
 
 

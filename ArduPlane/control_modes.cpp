@@ -70,6 +70,20 @@ Mode *Plane::mode_from_mode_num(const enum Mode::Number num)
     case Mode::Number::QAUTOTUNE:
         ret = &mode_qautotune;
         break;
+//添加代码
+    case Mode::Number::LOITER_ELLIPSE:
+		ret = &mode_loiter_ellipse;
+		break;
+    case Mode::Number::EIGHT_PLANE:
+		ret = &mode_eight_plane;
+		break;
+	case Mode::Number::LOITER_3D:
+		ret = &mode_loiter_3D;
+		break;
+	case Mode::Number::EIGHT_SPHERE:
+		ret = &mode_eight_sphere;
+		break;
+
     }
     return ret;
 }

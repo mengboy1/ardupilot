@@ -49,6 +49,11 @@ void Plane::failsafe_short_on_event(enum failsafe_state fstype, mode_reason_t re
             }
         }
         break;
+//修改代码
+	case Mode::Number::LOITER_ELLIPSE:	 // not finished
+	case Mode::Number::EIGHT_PLANE: // not finished
+	case Mode::Number::LOITER_3D: 	// not finished
+	case Mode::Number::EIGHT_SPHERE: // not finished
 
     case Mode::Number::CIRCLE:
     case Mode::Number::RTL:
@@ -111,7 +116,11 @@ void Plane::failsafe_long_on_event(enum failsafe_state fstype, mode_reason_t rea
             set_mode(mode_rtl, reason);
         }
         break;
-
+    case Mode::Number::LOITER_ELLIPSE:	 // not finished
+	case Mode::Number::EIGHT_PLANE: // not finished
+	case Mode::Number::LOITER_3D: 	// not finished
+	case Mode::Number::EIGHT_SPHERE: // not finished
+	
     case Mode::Number::RTL:
     case Mode::Number::QLAND:
     case Mode::Number::QRTL:

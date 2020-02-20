@@ -368,3 +368,13 @@
 #ifndef LANDING_GEAR_ENABLED
  #define LANDING_GEAR_ENABLED !HAL_MINIMIZE_FEATURES
 #endif
+
+// Winddrone
+/*#ifndef SIGMA_WIND_DEFAULT
+ # define SIGMA_WIND_DEFAULT      0
+#endif
+
+#ifndef OMEGA_WIND_DEFAULT
+ # define OMEGA_WIND_DEFAULT      0
+#endif*/
+

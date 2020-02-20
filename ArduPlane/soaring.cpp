@@ -54,6 +54,19 @@ void Plane::update_soaring() {
             set_mode(mode_loiter, MODE_REASON_SOARING_THERMAL_DETECTED);
         }
         break;
+//修改代码
+	case Mode::Number::LOITER_ELLIPSE:
+		// Do nothing. We will switch back to auto/rtl before enabling throttle.
+		break;
+	case Mode::Number::EIGHT_PLANE:
+		// Do nothing. We will switch back to auto/rtl before enabling throttle.
+	case Mode::Number::LOITER_3D:
+			// Do nothing. We will switch back to auto/rtl before enabling throttle.
+		break;
+	case Mode::Number::EIGHT_SPHERE:
+			// Do nothing. We will switch back to auto/rtl before enabling throttle.
+		break;
+
 
     case Mode::Number::LOITER:
         // Update thermal estimate and check for switch back to AUTO

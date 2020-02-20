@@ -111,6 +111,14 @@ public:
       This will be more than 1 if we have passed point2
      */
     float line_path_proportion(const Location &point1, const Location &point2) const;
+//修改代码
+	/*
+	  return the distance in meters in North/East/Down plane as a N/E/D vector
+	  from loc1 to loc2
+	 */
+	//Vector3f	location_3d_diff_NED(const struct Location &loc1, const struct Location &loc2);
+	Vector3f location_3d_diff_NED(const Location &loc2) const;
+
 
 private:
     static AP_Terrain *_terrain;

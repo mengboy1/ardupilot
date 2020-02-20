@@ -25,6 +25,13 @@ void        wgsllh2ecef(const Vector3d &llh, Vector3d &ecef);
 // coordinates (lat, lon, height)
 void        wgsecef2llh(const Vector3d &ecef, Vector3d &llh);
 
+//修改代码
+/*
+  return the distance in meters in North/East/Down plane as a N/E/D vector
+  from loc1 to loc2
+ */
+
+
 // return true when lat and lng are within range
 bool        check_lat(float lat);
 bool        check_lng(float lng);

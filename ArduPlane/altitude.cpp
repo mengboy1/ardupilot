@@ -54,6 +54,14 @@ void Plane::adjust_altitude_target()
     } else {
         set_target_altitude_location(next_WP_loc);
     }
+	 // code: Christoph Sieg:修改代码
+      if (control_mode == &mode_loiter_3D) {
+          set_target_altitude_location(S1_in_S2.desired_loc);
+      }
+      if (control_mode == &mode_eight_sphere) {
+          // code: Christoph Sieg:
+          set_target_altitude_location(eight_in_S2.desired_loc);
+      }
 
     altitude_error_cm = calc_altitude_error_cm();
 }
