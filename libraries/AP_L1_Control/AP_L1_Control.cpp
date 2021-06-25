@@ -493,15 +493,16 @@ void AP_L1_Control::update_loiter_ellipse(const struct Location &center_loc, con
     // update _target_bearing_cd
     _target_bearing_cd = _current_loc.get_bearing_to(center_loc);
 	gcs().send_text(MAV_SEVERITY_INFO, "Tuning: bearing %d",(int)_target_bearing_cd);
+	//Plane Archimedean spiral 
 	
-	   //每半圈改变无人机的半径 
+	   //Change the radius of the UAV every half turn 
 	   /*maxradius= maxradius_cm;
 	if ((_target_bearing_cd >= 18000 && _target_bearing_cd < 18100)||(_target_bearing_cd < 36000 && _target_bearing_cd > 35900))
 		{
 	    
 		if ((_target_bearing_cd-18000)<40 || abs(_target_bearing_cd-36000)<40)
 			{
-		   		num=num+1;//n代表n个半圈
+		   		num=num+1;//N stands for n semicycles 
 		   		gcs().send_text(MAV_SEVERITY_INFO, "Tuning: n %d",(int)num);
 			}
 		}*/
@@ -605,7 +606,7 @@ void AP_L1_Control::update_loiter_ellipse(const struct Location &center_loc, con
     const float posal1 = posalv * e1;
     const float posal2 = posalv * e2;
 	
-//阿基米德螺线code:mengboy
+//Archimedes screw  code:mengboy
 	const float ra = sqrt(sq(posal1) + sq(1/cos_theta * posal2));
 	/*if (ra<0)
 		{
@@ -613,9 +614,10 @@ void AP_L1_Control::update_loiter_ellipse(const struct Location &center_loc, con
 	}
 	else
 		{
-		maxradius= ra*100+_target_bearing_cd*M_PI/180;
+		maxradius= ra*100+_target_bearing_cd*M_PI/180;//Positive
+		//maxradius = ra*100.0f-_target_bearing_cd*M_PI/180;//Negative
 	}*/
-//sin正选曲线
+//sin curve
 	if (ra<0)
 		{
         maxradius= maxradius_cm;
@@ -893,7 +895,7 @@ void AP_L1_Control::update_loiter_3d(const struct Location &S2center, const Vect
 
 	  // distance of the aircraft from the center of the ellipse in meter
 	  const float ra = sqrt(sq(posal1) + sq(1/cos_theta * posal2));
-     //添加阿基米德螺线
+     //Add Archimedes spiral
      
 	 if (ra<0)
 		 {
@@ -901,8 +903,10 @@ void AP_L1_Control::update_loiter_3d(const struct Location &S2center, const Vect
 	 }
 	 else
 		 {
-		 maxradius= ra*100.0f+_target_bearing_cd*M_PI/180;
+		 maxradius= ra*100.0f+_target_bearing_cd*M_PI/180;//positive 
+		 //maxradius = ra*100.0f + sinf(_target_bearing_cd*M_PI/180);//positive sin
 		// maxradius= ra*100+exp(_target_bearing_cd*M_PI/180*0.15f);
+		//maxradius = ra*100.0f-_target_bearing_cd*M_PI/180;//Negative
 	 }
 	  
       // minimal height for flying unconstrained outside the sphere
